@@ -8,6 +8,8 @@
     "test:stk": "tsx src/scripts/testStk.ts",
     "test:token": "tsx src/scripts/testToken.ts",
     "db:migrate": "tsx src/db/migrate.ts",
+    "webhook:verify": "tsx src/scripts/verifyWebhook.ts",
+    "test": "vitest run",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
@@ -27,6 +29,7 @@
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
   }
 }

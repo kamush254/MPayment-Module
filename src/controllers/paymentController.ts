@@ -5,7 +5,7 @@ import { createPayment,getPayment,reconcilePayment } from "../services/paymentSe
 
 
 export async function initiatePayment(req: Request, res: Response) {
-  const { amount, phone, accountReference, description, idempotencyKey } = req.body ?? {};
+   const { amount, phone, accountReference, description, idempotencyKey, callbackUrl } = req.body ?? {};
 
   // Validate input
   if (!Number.isInteger(amount) || amount <= 0) {
@@ -19,6 +19,11 @@ export async function initiatePayment(req: Request, res: Response) {
   }
   if (typeof idempotencyKey !== "string" || !idempotencyKey) {
     return res.status(400).json({ error: "idempotencyKey is required" });
+  }
+    if (callbackUrl !== undefined) {
+    if (typeof callbackUrl !== "string" || !/^https:\/\/[^\s]+$/.test(callbackUrl) || callbackUrl.length > 500) {
+      return res.status(400).json({ error: "callbackUrl must be an https URL" });
+    }
   }
   const desc = typeof description === "string" && description ? description : "Payment";
   if (desc.length > 13) {
@@ -39,6 +44,7 @@ export async function initiatePayment(req: Request, res: Response) {
       phone: normalizedPhone,
       accountReference,
       description: desc,
+      webhookUrl: callbackUrl,
     });
 
     return res.status(created ? 201 : 200).json({

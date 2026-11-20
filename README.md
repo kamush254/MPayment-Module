@@ -25,6 +25,7 @@ PENDING, SUCCESS, FAILED, CANCELLED, TIMEOUT, UNCONFIRMED
 - A response of "still processing" from Safaricom never finalises a payment.
 -- A payment still PENDING after 30 minutes becomes UNCONFIRMED; a late callback can still finalise it.
 -- A SUCCESS callback is only accepted if its Amount equals the payment's amount.
+-- A FAILED payment that Safaricom never accepted (no checkout id) can be retried with the same idempotencyKey. Any other status is never retried.
 
 ## API authentication
 Create an API client with `npm run client:create -- "App Name"` and save the generated key securely. In PowerShell, enter the key when prompted, then use it in the same session:

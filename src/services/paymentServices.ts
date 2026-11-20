@@ -1,58 +1,66 @@
 import {
   insertPayment,
-   findById,
+  findById,
   findByIdempotencyKey,
   attachCheckoutIds,
   markFailed,
-    markResult,
+  markResult,
+  resetForRetry,
   Payment,
   NewPayment,
 } from "../db/paymentRepository";
 import { initiateStkPush } from "./darajaStk";
 import { queryStkStatus } from "./darajaQuery";
 import { mapStatus } from "./callbackService";
+import { sendWebhook } from "./webhookServices";
 
 export interface CreatePaymentResult {
   payment: Payment;
   created: boolean; // false means this was a duplicate request
 }
 
+async function pushToSafaricom(payment: Payment): Promise<Payment> {
+  try {
+    const stk = await initiateStkPush({
+      amount: payment.amount,
+      phone: payment.phone,
+      accountReference: payment.account_reference,
+      description: payment.description ?? "Payment",
+    });
+
+    if (stk.responseCode !== "0") {
+      return await markFailed(payment.id, stk.responseDescription);
+    }
+
+    return await attachCheckoutIds(payment.id, stk.checkoutRequestId, stk.merchantRequestId);
+  } catch (err: any) {
+    const reason = JSON.stringify(err.response?.data ?? err.message);
+    await markFailed(payment.id, reason);
+    throw err;
+  }
+}
+
 export async function createPayment(input: NewPayment): Promise<CreatePaymentResult> {
   // 1. Save a PENDING record first
   const inserted = await insertPayment(input);
 
-  if (!inserted) {
-    // Same idempotency key was used before: return the original, do not charge again
-    const existing = await findByIdempotencyKey(input.idempotencyKey);
-    return { payment: existing as Payment, created: false };
+  if (inserted) {
+    return { payment: await pushToSafaricom(inserted), created: true };
   }
 
-  // 2. Ask Safaricom to send the prompt
-  try {
-    const stk = await initiateStkPush({
-      amount: input.amount,
-      phone: input.phone,
-      accountReference: input.accountReference,
-      description: input.description,
-    });
+  // 2. Same idempotency key was used before
+  const existing = (await findByIdempotencyKey(input.idempotencyKey)) as Payment;
 
-    if (stk.responseCode !== "0") {
-      const failed = await markFailed(inserted.id, stk.responseDescription);
-      return { payment: failed, created: true };
+  // 3. Retry only if Safaricom never accepted the earlier attempt
+  if (existing.status === "FAILED" && !existing.checkout_request_id) {
+    const reset = await resetForRetry(existing.id);
+    if (reset) {
+      return { payment: await pushToSafaricom(reset), created: true };
     }
-
-    // 3. Store Safaricom's IDs so the callback can find this row later
-    const updated = await attachCheckoutIds(
-      inserted.id,
-      stk.checkoutRequestId,
-      stk.merchantRequestId
-    );
-    return { payment: updated, created: true };
-  } catch (err: any) {
-    const reason = JSON.stringify(err.response?.data ?? err.message);
-    await markFailed(inserted.id, reason);
-    throw err;
   }
+
+  // 4. Anything else: return the original, do not charge again
+  return { payment: existing, created: false };
 }
 export async function getPayment(id: string): Promise<Payment | null> {
   return findById(id);
@@ -98,5 +106,6 @@ export async function reconcilePayment(id: string): Promise<ReconcileResult | nu
     return { payment: latest, checked: true, note: "Finalised by another update first" };
   }
 
+  void sendWebhook(updated);
   return { payment: updated, checked: true, note: `Updated to ${updated.status}` };
 }

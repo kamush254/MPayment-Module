@@ -1,5 +1,6 @@
 import { insertRawCallback } from "../db/callbackRepository";
 import { markResult,findByCheckoutRequestId } from "../db/paymentRepository";
+import { sendWebhook } from "./webhookServices";
 
 
 // Translate Safaricom's result codes into our own clean statuses
@@ -63,6 +64,7 @@ export async function processStkCallback(payload: any): Promise<void> {
 
   if (updated) {
     console.log(`Payment ${updated.id} is now ${updated.status}`);
+        void sendWebhook(updated);
   } else {
     console.log(
       `Callback for ${callback.CheckoutRequestID} changed nothing (unknown payment or already finalised)`

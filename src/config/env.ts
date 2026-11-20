@@ -18,6 +18,7 @@ export const env = {
   port: Number(process.env.PORT) || 3000,
   databaseUrl: required("DATABASE_URL"),
     callbackToken: required("CALLBACK_TOKEN"),
+      webhookSecret: required("WEBHOOK_SECRET"),
   daraja: {
     env: darajaEnv,
     baseUrl:
