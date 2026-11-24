@@ -4,7 +4,9 @@ import { reconcilePayment } from "../services/paymentServices";
 const INTERVAL_MS = 60_000; // run every minute
 const MIN_AGE_MINUTES = 2; // ignore payments younger than this
 const GIVE_UP_AFTER_MINUTES = 30; // then mark UNCONFIRMED
-const BATCH_SIZE = 20; // max payments checked per run
+const BATCH_SIZE = 10; // max payments checked per run
+const DELAY_BETWEEN_QUERIES_MS = 2_500; // stays under Safaricom's 30/min, burst 3
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let running = false;
 
@@ -28,6 +30,7 @@ export async function runReconcileOnce(): Promise<void> {
           // One bad payment must not stop the rest
           console.error(`Reconcile job: ${payment.id} failed:`, err.response?.data ?? err.message);
         }
+        await sleep(DELAY_BETWEEN_QUERIES_MS);
       }
     }
 

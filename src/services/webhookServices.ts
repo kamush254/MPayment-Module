@@ -2,11 +2,20 @@ import crypto from "crypto";
 import axios from "axios";
 import { env } from "../config/env";
 import { Payment, markWebhookDelivered } from "../db/paymentRepository";
+import { getWebhookSecret } from "../db/apiClientRepository";
 
 const RETRY_DELAYS_MS = [0, 5_000, 30_000]; // try now, then after 5s, then after 30s
 
-function sign(body: string): string {
-  return crypto.createHmac("sha256", env.webhookSecret).update(body).digest("hex");
+async function secretFor(payment: Payment): Promise<string> {
+  if (payment.client_id) {
+    const own = await getWebhookSecret(payment.client_id);
+    if (own) return own;
+  }
+  return env.webhookSecret; // older payments and clients without a secret
+}
+
+function sign(body: string, secret: string): string {
+  return crypto.createHmac("sha256", secret).update(body).digest("hex");
 }
 
 export async function sendWebhook(payment: Payment): Promise<void> {
@@ -22,7 +31,7 @@ export async function sendWebhook(payment: Payment): Promise<void> {
     resultDescription: payment.result_desc,
     updatedAt: payment.updated_at,
   });
-  const signature = sign(body);
+  const signature = sign(body, await secretFor(payment));
 
   for (const delay of RETRY_DELAYS_MS) {
     if (delay > 0) await new Promise((r) => setTimeout(r, delay));

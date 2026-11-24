@@ -29,3 +29,5 @@ CREATE TABLE IF NOT EXISTS api_clients (
 );
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS webhook_url TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS webhook_delivered_at TIMESTAMPTZ;
+ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES api_clients(id);

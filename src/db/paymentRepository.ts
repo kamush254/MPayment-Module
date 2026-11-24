@@ -3,6 +3,7 @@ import { pool } from "./pool";
 export interface Payment {
   id: string;
   idempotency_key: string;
+  client_id: number | null;
   amount: number;
   phone: string;
   account_reference: string;
@@ -21,6 +22,7 @@ export interface Payment {
 
 export interface NewPayment {
   idempotencyKey: string;
+  clientId: number;
   amount: number;
   phone: string;
   accountReference: string;
@@ -31,11 +33,11 @@ export interface NewPayment {
 // Returns the new row, or null if this idempotency key already exists
 export async function insertPayment(p: NewPayment): Promise<Payment | null> {
   const result = await pool.query<Payment>(
-    `INSERT INTO payments (idempotency_key, amount, phone, account_reference, description, webhook_url)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO payments (idempotency_key, amount, phone, account_reference, description, webhook_url, client_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (idempotency_key) DO NOTHING
      RETURNING *`,
-    [p.idempotencyKey, p.amount, p.phone, p.accountReference, p.description, p.webhookUrl ?? null]
+    [p.idempotencyKey, p.amount, p.phone, p.accountReference, p.description, p.webhookUrl ?? null, p.clientId ?? null]
   );
   return result.rows[0] ?? null;
 }

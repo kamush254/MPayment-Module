@@ -19,7 +19,8 @@ if (!fs.existsSync(resolvedBodyPath)) {
 }
 
 const body = fs.readFileSync(resolvedBodyPath, "utf8");
-const expected = crypto.createHmac("sha256", env.webhookSecret).update(body).digest("hex");
+const secret = process.env.VERIFY_SECRET ?? env.webhookSecret;
+const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
 
 const a = Buffer.from(expected);
 const b = Buffer.from(signature);

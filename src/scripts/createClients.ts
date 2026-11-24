@@ -1,4 +1,8 @@
-import { generateApiKey, hashApiKey } from "../utils/apiKey";
+import {
+  generateApiKey,
+  generateWebhookSecret,
+  hashApiKey,
+} from "../utils/apiKey";
 import { createClient } from "../db/apiClientRepository";
 import { pool } from "../db/pool";
 
@@ -10,11 +14,14 @@ async function main() {
   }
 
   const key = generateApiKey();
-  await createClient(name, hashApiKey(key));
+  const webhookSecret = generateWebhookSecret();
+  await createClient(name, hashApiKey(key), webhookSecret);
 
   console.log(`Client created: ${name}`);
   console.log("API key (shown ONCE, save it now):");
   console.log(key);
+  console.log("Webhook secret (shown ONCE, save it now):");
+  console.log(webhookSecret);
   await pool.end();
 }
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { hashApiKey } from "../utils/apiKey";
-import { isValidKeyHash } from "../db/apiClientRepository";
+import { findClientByKeyHash } from "../db/apiClientRepository";
 
 export async function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const key = req.header("x-api-key");
@@ -8,12 +8,12 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
   if (!key) {
     return res.status(401).json({ error: "Missing API key" });
   }
-
   try {
-    const valid = await isValidKeyHash(hashApiKey(key));
-    if (!valid) {
+    const client = await findClientByKeyHash(hashApiKey(key));
+    if (!client) {
       return res.status(401).json({ error: "Invalid API key" });
     }
+    res.locals.clientId = client.id;
     next();
   } catch (err: any) {
     console.error("API key check failed:", err.message);

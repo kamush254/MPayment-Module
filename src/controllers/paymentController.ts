@@ -5,6 +5,7 @@ import { createPayment,getPayment,reconcilePayment } from "../services/paymentSe
 
 
 export async function initiatePayment(req: Request, res: Response) {
+  const clientId = res.locals.clientId as number;
    const { amount, phone, accountReference, description, idempotencyKey, callbackUrl } = req.body ?? {};
 
   // Validate input
@@ -39,7 +40,8 @@ export async function initiatePayment(req: Request, res: Response) {
 
   try {
     const { payment, created } = await createPayment({
-      idempotencyKey,
+      idempotencyKey: `${clientId}:${idempotencyKey}`,
+      clientId,
       amount,
       phone: normalizedPhone,
       accountReference,
@@ -61,12 +63,21 @@ export async function initiatePayment(req: Request, res: Response) {
 }
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+async function ownsPayment(id: string, clientId: number): Promise<boolean> {
+  const p = await getPayment(id);
+  // Payments from before Phase 19 have no client and stay visible
+  return !!p && (p.client_id === null || p.client_id === clientId);
+}
+
 export async function getPaymentStatus(req: Request, res: Response) {
   const id = String(req.params.id);
 
   // PostgreSQL throws an error if given a malformed UUID, so check the shape first
   if (!UUID_REGEX.test(id)) {
     return res.status(400).json({ error: "id must be a valid payment id" });
+  }
+  if (!(await ownsPayment(id, res.locals.clientId as number))) {
+    return res.status(404).json({ error: "Payment not found" });
   }
 
   try {
@@ -96,6 +107,9 @@ export async function reconcilePaymentStatus(req: Request, res: Response) {
 
   if (!UUID_REGEX.test(id)) {
     return res.status(400).json({ error: "id must be a valid payment id" });
+  }
+  if (!(await ownsPayment(id, res.locals.clientId as number))) {
+    return res.status(404).json({ error: "Payment not found" });
   }
 
   try {

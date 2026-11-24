@@ -55,6 +55,10 @@ export async function queryStkStatus(checkoutRequestId: string): Promise<StkQuer
     const body = err.response?.data;
     const message: string = body?.errorMessage ?? err.message;
     const code: string = body?.errorCode ?? "";
+    const faultCode: string = body?.fault?.detail?.errorcode ?? "";
+    if (faultCode === "policies.ratelimit.SpikeArrestViolation") {
+      return { resultCode: null, resultDesc: "Rate limited by Safaricom, will retry later" };
+    }
 
     if (/being processed/i.test(message) || code === "500.001.1001") {
       return {
