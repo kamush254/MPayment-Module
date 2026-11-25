@@ -1,5 +1,5 @@
 import axios from "axios";
-import { env } from "../config/env";
+import { DarajaConfig } from "./darajaConfig";
 import { getAccessToken } from "./darajaAuth";
 import { buildTimestamp } from "../utils/timestamp";
 
@@ -8,19 +8,22 @@ export interface StkQueryResult {
   resultDesc: string;
 }
 
-export async function queryStkStatus(checkoutRequestId: string): Promise<StkQueryResult> {
-  const token = await getAccessToken();
+export async function queryStkStatus(
+  checkoutRequestId: string,
+  cfg: DarajaConfig
+): Promise<StkQueryResult> {
+  const token = await getAccessToken(cfg);
   const timestamp = buildTimestamp();
 
   const password = Buffer.from(
-    `${env.daraja.shortcode}${env.daraja.passkey}${timestamp}`
+    `${cfg.shortcode}${cfg.passkey}${timestamp}`
   ).toString("base64");
 
   try {
     const response = await axios.post(
-      `${env.daraja.baseUrl}/mpesa/stkpushquery/v1/query`,
+      `${cfg.baseUrl}/mpesa/stkpushquery/v1/query`,
       {
-        BusinessShortCode: env.daraja.shortcode,
+        BusinessShortCode: cfg.shortcode,
         Password: password,
         Timestamp: timestamp,
         CheckoutRequestID: checkoutRequestId,

@@ -1,29 +1,32 @@
 import axios from "axios";
-import { env } from "../config/env";
+import { DarajaConfig } from "./darajaConfig";
 
-let cachedToken: string | null = null;
-let tokenExpiresAt = 0;
+// One saved token per owner
+const cache = new Map<string, { token: string; expiresAt: number }>();
 
-export async function getAccessToken(): Promise<string> {
+export async function getAccessToken(cfg: DarajaConfig): Promise<string> {
+  const cacheKey = `${cfg.baseUrl}|${cfg.consumerKey}`;
+  const saved = cache.get(cacheKey);
+
   // Reuse the token if it is still valid (with a 60 second safety margin)
-  if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
-    return cachedToken;
+  if (saved && Date.now() < saved.expiresAt - 60_000) {
+    return saved.token;
   }
 
-  const credentials = Buffer.from(
-    `${env.daraja.consumerKey}:${env.daraja.consumerSecret}`
-  ).toString("base64");
+  const credentials = Buffer.from(`${cfg.consumerKey}:${cfg.consumerSecret}`).toString("base64");
 
   const response = await axios.get(
-    `${env.daraja.baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
+    `${cfg.baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
     {
       headers: { Authorization: `Basic ${credentials}` },
       timeout: 15_000,
     }
   );
 
-  cachedToken = response.data.access_token;
-  tokenExpiresAt = Date.now() + Number(response.data.expires_in) * 1000;
-
-  return cachedToken as string;
+  const token = response.data.access_token as string;
+  cache.set(cacheKey, {
+    token,
+    expiresAt: Date.now() + Number(response.data.expires_in) * 1000,
+  });
+  return token;
 }

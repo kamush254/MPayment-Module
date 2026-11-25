@@ -27,8 +27,11 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   callbackToken: required("CALLBACK_TOKEN"),
   webhookSecret: required("WEBHOOK_SECRET"),
+  encryptionKey: required("ENCRYPTION_KEY"),
+
   daraja: {
     env: darajaEnv,
+    
     baseUrl:
       darajaEnv === "production"
         ? "https://api.safaricom.co.ke"
@@ -40,6 +43,10 @@ export const env = {
     callbackUrl: optional("DARAJA_CALLBACK_URL"),
   },
 };
+
+if (!/^[0-9a-f]{64}$/i.test(env.encryptionKey)) {
+  throw new Error("ENCRYPTION_KEY must be 64 hex characters");
+}
 
 if (env.callbackIpMode === "enforce" && env.callbackAllowedIps.length === 0) {
   throw new Error("CALLBACK_IP_MODE=enforce requires CALLBACK_ALLOWED_IPS");

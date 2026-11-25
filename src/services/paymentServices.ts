@@ -1,3 +1,4 @@
+import { getDarajaConfig } from "./darajaConfig";
 import {
   insertPayment,
   findById,
@@ -21,24 +22,35 @@ export interface CreatePaymentResult {
 
 async function pushToSafaricom(payment: Payment): Promise<Payment> {
   try {
-    const stk = await initiateStkPush({
-      amount: payment.amount,
-      phone: payment.phone,
-      accountReference: payment.account_reference,
-      description: payment.description ?? "Payment",
-    });
+    const cfg = await getDarajaConfig(payment.client_id);
+    const stk = await initiateStkPush(
+      {
+        amount: payment.amount,
+        phone: payment.phone,
+        accountReference: payment.account_reference,
+        description: payment.description ?? "Payment",
+      },
+      cfg
+    );
 
-    if (stk.responseCode !== "0") {
-      return await markFailed(payment.id, stk.responseDescription);
-    }
-
-    return await attachCheckoutIds(payment.id, stk.checkoutRequestId, stk.merchantRequestId);
-  } catch (err: any) {
-    const reason = JSON.stringify(err.response?.data ?? err.message);
+    return attachCheckoutIds(
+      payment.id,
+      stk.checkoutRequestId,
+      stk.merchantRequestId
+    );
+  } catch (err: unknown) {
+    const axiosData =
+      typeof err === "object" && err !== null && "response" in err
+        ? (err as { response?: { data?: unknown } }).response?.data
+        : undefined;
+    const reason = JSON.stringify(
+      axiosData ?? (err instanceof Error ? err.message : String(err))
+    );
     await markFailed(payment.id, reason);
     throw err;
   }
 }
+
 
 export async function createPayment(input: NewPayment): Promise<CreatePaymentResult> {
   // 1. Save a PENDING record first
@@ -49,7 +61,10 @@ export async function createPayment(input: NewPayment): Promise<CreatePaymentRes
   }
 
   // 2. Same idempotency key was used before
-  const existing = (await findByIdempotencyKey(input.idempotencyKey)) as Payment;
+  const existing = await findByIdempotencyKey(input.idempotencyKey);
+  if (!existing) {
+    throw new Error("Failed to load the existing payment");
+  }
 
   // 3. Retry only if Safaricom never accepted the earlier attempt
   if (existing.status === "FAILED" && !existing.checkout_request_id) {
@@ -83,7 +98,8 @@ export async function reconcilePayment(id: string): Promise<ReconcileResult | nu
     return { payment, checked: false, note: "Payment has no checkout request id" };
   }
 
-  const answer = await queryStkStatus(payment.checkout_request_id);
+  const cfg = await getDarajaConfig(payment.client_id);
+  const answer = await queryStkStatus(payment.checkout_request_id, cfg);
 
   if (answer.resultCode === null) {
     return { payment, checked: true, note: `Still pending: ${answer.resultDesc}` };

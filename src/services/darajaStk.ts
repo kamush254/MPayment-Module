@@ -1,5 +1,5 @@
 import axios from "axios";
-import { env } from "../config/env";
+import { DarajaConfig } from "./darajaConfig";
 import { getAccessToken } from "./darajaAuth";
 import { buildTimestamp } from "../utils/timestamp";
 
@@ -18,8 +18,8 @@ export interface StkPushResult {
   customerMessage: string;
 }
 
-export async function initiateStkPush(input: StkPushInput): Promise<StkPushResult> {
-  const { shortcode, passkey, callbackUrl } = env.daraja;
+export async function initiateStkPush(input: StkPushInput, cfg: DarajaConfig): Promise<StkPushResult> {
+  const { shortcode, passkey, callbackUrl } = cfg;
   if (!shortcode || !/^\d+$/.test(shortcode)) {
     throw new Error("DARAJA_SHORTCODE must be set to a valid Daraja business shortcode.");
   }
@@ -30,7 +30,7 @@ export async function initiateStkPush(input: StkPushInput): Promise<StkPushResul
     throw new Error("DARAJA_CALLBACK_URL must be set before initiating an STK push.");
   }
 
-  const token = await getAccessToken();
+  const token = await getAccessToken(cfg);
   const timestamp = buildTimestamp();
 
   const password = Buffer.from(
@@ -52,7 +52,7 @@ export async function initiateStkPush(input: StkPushInput): Promise<StkPushResul
   };
 
   const response = await axios.post(
-    `${env.daraja.baseUrl}/mpesa/stkpush/v1/processrequest`,
+    `${cfg.baseUrl}/mpesa/stkpush/v1/processrequest`,
     body,
     {
       headers: { Authorization: `Bearer ${token}` },

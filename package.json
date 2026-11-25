@@ -11,6 +11,7 @@
     "webhook:verify": "tsx src/scripts/verifyWebhook.ts",
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
+    "client:mpesa": "tsx src/scripts/setMpesa.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
