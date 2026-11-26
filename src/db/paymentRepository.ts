@@ -65,15 +65,26 @@ export async function attachCheckoutIds(
   return result.rows[0];
 }
 
-export async function markFailed(id: string, reason: string): Promise<Payment> {
+export async function markFailed(id: string, reason: string): Promise<Payment | null> {
   const result = await pool.query<Payment>(
     `UPDATE payments
      SET status = 'FAILED', result_desc = $2, updated_at = NOW()
-     WHERE id = $1
+     WHERE id = $1 AND status = 'PENDING'
      RETURNING *`,
     [id, reason]
   );
-  return result.rows[0];
+  return result.rows[0] ?? null;
+}
+
+export async function markUnconfirmedById(id: string, reason: string): Promise<Payment | null> {
+  const result = await pool.query<Payment>(
+    `UPDATE payments
+     SET status = 'UNCONFIRMED', result_desc = $2, updated_at = NOW()
+     WHERE id = $1 AND status = 'PENDING'
+     RETURNING *`,
+    [id, reason]
+  );
+  return result.rows[0] ?? null;
 }
 // Updates a payment from a callback result.
 // The "AND status = 'PENDING'" guard means a payment can only be finalised once.

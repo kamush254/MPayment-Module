@@ -36,7 +36,17 @@ export async function processStkCallback(payload: any): Promise<void> {
   }
 
   // 2. Work out the new status
-  const resultCode = Number(callback.ResultCode);
+  const rawResultCode = callback.ResultCode;
+  const resultCode =
+    typeof rawResultCode === "number"
+      ? rawResultCode
+      : typeof rawResultCode === "string" && /^\d+$/.test(rawResultCode)
+        ? Number(rawResultCode)
+        : NaN;
+  if (!Number.isSafeInteger(resultCode) || resultCode < 0) {
+    console.warn("Callback ignored: invalid result code");
+    return;
+  }
   const status = mapStatus(resultCode);
   const receipt = status === "SUCCESS" ? extractReceipt(callback) : null;
     // Safety check: a SUCCESS must report the same amount we asked for

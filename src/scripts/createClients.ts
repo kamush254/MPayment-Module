@@ -15,9 +15,10 @@ async function main() {
 
   const key = generateApiKey();
   const webhookSecret = generateWebhookSecret();
-  await createClient(name, hashApiKey(key), webhookSecret);
+  const clientId = await createClient(name, hashApiKey(key), webhookSecret);
 
   console.log(`Client created: ${name}`);
+  console.log(`Client ID: ${clientId}`);
   console.log("API key (shown ONCE, save it now):");
   console.log(key);
   console.log("Webhook secret (shown ONCE, save it now):");

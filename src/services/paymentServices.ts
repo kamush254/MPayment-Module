@@ -5,12 +5,13 @@ import {
   findByIdempotencyKey,
   attachCheckoutIds,
   markFailed,
+  markUnconfirmedById,
   markResult,
   resetForRetry,
   Payment,
   NewPayment,
 } from "../db/paymentRepository";
-import { initiateStkPush } from "./darajaStk";
+import { initiateStkPush, StkPushOutcomeUnknownError } from "./darajaStk";
 import { queryStkStatus } from "./darajaQuery";
 import { mapStatus } from "./callbackService";
 import { sendWebhook } from "./webhookServices";
@@ -21,9 +22,10 @@ export interface CreatePaymentResult {
 }
 
 async function pushToSafaricom(payment: Payment): Promise<Payment> {
+  let stk: Awaited<ReturnType<typeof initiateStkPush>>;
   try {
     const cfg = await getDarajaConfig(payment.client_id);
-    const stk = await initiateStkPush(
+    stk = await initiateStkPush(
       {
         amount: payment.amount,
         phone: payment.phone,
@@ -31,12 +33,6 @@ async function pushToSafaricom(payment: Payment): Promise<Payment> {
         description: payment.description ?? "Payment",
       },
       cfg
-    );
-
-    return attachCheckoutIds(
-      payment.id,
-      stk.checkoutRequestId,
-      stk.merchantRequestId
     );
   } catch (err: unknown) {
     const axiosData =
@@ -46,7 +42,26 @@ async function pushToSafaricom(payment: Payment): Promise<Payment> {
     const reason = JSON.stringify(
       axiosData ?? (err instanceof Error ? err.message : String(err))
     );
-    await markFailed(payment.id, reason);
+    if (err instanceof StkPushOutcomeUnknownError) {
+      await markUnconfirmedById(payment.id, reason);
+    } else {
+      await markFailed(payment.id, reason);
+    }
+    throw err;
+  }
+
+  try {
+    return await attachCheckoutIds(
+      payment.id,
+      stk.checkoutRequestId,
+      stk.merchantRequestId
+    );
+  } catch (err: unknown) {
+    const reason =
+      err instanceof Error
+        ? `Safaricom accepted the STK request but saving its checkout IDs failed: ${err.message}`
+        : "Safaricom accepted the STK request but saving its checkout IDs failed";
+    await markUnconfirmedById(payment.id, reason);
     throw err;
   }
 }
@@ -91,7 +106,7 @@ export async function reconcilePayment(id: string): Promise<ReconcileResult | nu
   if (!payment) return null;
 
   // Only unfinished payments with a checkout id are worth asking about
-  if (payment.status !== "PENDING") {
+  if (payment.status !== "PENDING" && payment.status !== "UNCONFIRMED") {
     return { payment, checked: false, note: "Payment is already finalised" };
   }
   if (!payment.checkout_request_id) {
@@ -118,7 +133,10 @@ export async function reconcilePayment(id: string): Promise<ReconcileResult | nu
 
   if (!updated) {
     // A callback finalised it while we were asking
-    const latest = (await findById(id)) as Payment;
+    const latest = await findById(id);
+    if (!latest) {
+      return { payment, checked: true, note: "Payment disappeared during reconciliation" };
+    }
     return { payment: latest, checked: true, note: "Finalised by another update first" };
   }
 

@@ -35,10 +35,10 @@ export async function queryStkStatus(
     );
 
     const data = response.data;
-    const code = data.ResultCode;
+    const code = data?.ResultCode;
 
     // If there is no ResultCode, there is no final answer yet
-        const desc: string = data.ResultDesc ?? data.ResponseDescription ?? "";
+    const desc: string = data?.ResultDesc ?? data?.ResponseDescription ?? "";
 
     // No result code, or Safaricom says it is still processing: not final yet
     if (
@@ -50,10 +50,18 @@ export async function queryStkStatus(
       return { resultCode: null, resultDesc: desc || "No result yet" };
     }
 
-    return { resultCode: Number(code), resultDesc: desc };
+    const resultCode =
+      typeof code === "number"
+        ? code
+        : typeof code === "string" && /^\d+$/.test(code)
+          ? Number(code)
+          : NaN;
+    if (!Number.isSafeInteger(resultCode)) {
+      throw new Error("Safaricom returned an invalid STK query result code");
+    }
 
-    return { resultCode: Number(code), resultDesc: data.ResultDesc ?? "" };
-    } catch (err: any) {
+    return { resultCode, resultDesc: desc };
+  } catch (err: any) {
     // Safaricom often answers 500 while the customer is still deciding, sometimes with an empty message
     const body = err.response?.data;
     const message: string = body?.errorMessage ?? err.message;

@@ -37,3 +37,4 @@ ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS mpesa_passkey_enc TEXT;
 ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS mpesa_consumer_key_enc TEXT;
 ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS mpesa_consumer_secret_enc TEXT;
 ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS mpesa_env TEXT;
+ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS mpesa_till_number TEXT;

@@ -8,6 +8,8 @@ export interface DarajaConfig {
   consumerKey: string;
   consumerSecret: string;
   callbackUrl: string;
+  transactionType: "CustomerPayBillOnline" | "CustomerBuyGoodsOnline";
+  partyB: string;
 }
 
 // Finds the M-Pesa details to use for a payment
@@ -31,6 +33,8 @@ export async function getDarajaConfig(clientId: number | null): Promise<DarajaCo
       consumerKey: env.daraja.consumerKey,
       consumerSecret: env.daraja.consumerSecret,
       callbackUrl: env.daraja.callbackUrl,
+      transactionType: "CustomerPayBillOnline",
+      partyB: env.daraja.shortcode,
     };
   }
 
@@ -38,24 +42,18 @@ export async function getDarajaConfig(clientId: number | null): Promise<DarajaCo
   if (!c) {
     throw new Error("This client has no M-Pesa details saved");
   }
+  let transactionType: DarajaConfig["transactionType"] = "CustomerPayBillOnline";
+  let partyB = c.shortcode;
   if (c.type === "till") {
-    throw new Error("Till is not supported yet (coming in Step 4)");
+    if (!c.tillNumber) {
+      throw new Error("This client is a Till but has no till number saved");
+    }
+    transactionType = "CustomerBuyGoodsOnline";
+    partyB = c.tillNumber;
   }
   if (!env.daraja.callbackUrl) {
     throw new Error("DARAJA_CALLBACK_URL must be set");
-$keyA2 = "<App A2 API key>"
-if ([string]::IsNullOrWhiteSpace($keyA2)) {
-    throw "App A2 API key is missing"
-}
-
-$r = Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/payments" `
-  -Headers @{ "x-api-key" = $keyA2 } `
-  -ContentType "application/json" `
-  -Body '{"amount":1,"phone":"0708374149","accountReference":"ORDER030","description":"Test","idempotencyKey":"owner-test-1"}'
-
-$r  }
+  }
 
   return {
     baseUrl:
@@ -67,5 +65,7 @@ $r  }
     consumerKey: c.consumerKey,
     consumerSecret: c.consumerSecret,
     callbackUrl: env.daraja.callbackUrl,
+    transactionType,
+    partyB,
   };
 }

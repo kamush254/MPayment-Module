@@ -67,6 +67,23 @@ function successCallback(amount: number) {
 }
 
 describe("processStkCallback amount check", () => {
+  it("ignores callbacks with a missing result code", async () => {
+    vi.mocked(repo.findByCheckoutRequestId).mockClear();
+    vi.mocked(repo.markResult).mockClear();
+
+    await processStkCallback({
+      Body: {
+        stkCallback: {
+          CheckoutRequestID: "ws_CO_TEST",
+          ResultCode: null,
+        },
+      },
+    });
+
+    expect(repo.findByCheckoutRequestId).not.toHaveBeenCalled();
+    expect(repo.markResult).not.toHaveBeenCalled();
+  });
+
   it("does not finalise when the amount differs", async () => {
     vi.mocked(repo.findByCheckoutRequestId).mockResolvedValue(payment(5));
     vi.mocked(repo.markResult).mockClear();

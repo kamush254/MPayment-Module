@@ -5,11 +5,18 @@ export async function createClient(
   name: string,
   keyHash: string,
   webhookSecret: string
-): Promise<void> {
-  await pool.query(
-    `INSERT INTO api_clients (name, key_hash, webhook_secret) VALUES ($1, $2, $3)`,
+): Promise<number> {
+  const result = await pool.query<{ id: number }>(
+    `INSERT INTO api_clients (name, key_hash, webhook_secret)
+     VALUES ($1, $2, $3)
+     RETURNING id`,
     [name, keyHash, webhookSecret]
   );
+  const client = result.rows[0];
+  if (!client) {
+    throw new Error("Failed to create API client");
+  }
+  return client.id;
 }
 
 export async function findClientByKeyHash(keyHash: string): Promise<{ id: number } | null> {
@@ -22,9 +29,14 @@ export async function findClientByKeyHash(keyHash: string): Promise<{ id: number
 
 export async function findClientByName(name: string): Promise<{ id: number } | null> {
   const result = await pool.query<{ id: number }>(
-    `SELECT id FROM api_clients WHERE name = $1 AND is_active = TRUE`,
+    `SELECT id FROM api_clients WHERE name = $1 AND is_active = TRUE
+     ORDER BY id
+     LIMIT 2`,
     [name]
   );
+  if (result.rows.length > 1) {
+    throw new Error(`Multiple active clients named "${name}"; use the client ID instead`);
+  }
   return result.rows[0] ?? null;
 }
 
@@ -36,6 +48,7 @@ export async function getWebhookSecret(clientId: number): Promise<string | null>
   return result.rows[0]?.webhook_secret ?? null;
 }
 export interface MpesaCredentials {
+  tillNumber?: string;
   shortcode: string;
   type: "paybill" | "till";
   env: "sandbox" | "production";
@@ -52,7 +65,8 @@ export async function saveMpesaCredentials(
   const result = await pool.query(
     `UPDATE api_clients
      SET mpesa_shortcode = $2, mpesa_type = $3, mpesa_env = $4,
-         mpesa_passkey_enc = $5, mpesa_consumer_key_enc = $6, mpesa_consumer_secret_enc = $7
+         mpesa_passkey_enc = $5, mpesa_consumer_key_enc = $6, mpesa_consumer_secret_enc = $7,
+         mpesa_till_number = $8
      WHERE id = $1`,
     [
       clientId,
@@ -62,6 +76,7 @@ export async function saveMpesaCredentials(
       encrypt(c.passkey),
       encrypt(c.consumerKey),
       encrypt(c.consumerSecret),
+      c.tillNumber ?? null,
     ]
   );
   return result.rowCount === 1;
@@ -72,6 +87,7 @@ export async function saveMpesaCredentials(
 export async function getMpesaCredentials(clientId: number): Promise<MpesaCredentials | null> {
   const result = await pool.query(
     `SELECT mpesa_shortcode, mpesa_type, mpesa_env,
+            mpesa_till_number,
             mpesa_passkey_enc, mpesa_consumer_key_enc, mpesa_consumer_secret_enc
      FROM api_clients WHERE id = $1`,
     [clientId]
@@ -90,6 +106,7 @@ export async function getMpesaCredentials(clientId: number): Promise<MpesaCreden
     shortcode: row.mpesa_shortcode,
     type: row.mpesa_type === "till" ? "till" : "paybill",
     env: row.mpesa_env === "production" ? "production" : "sandbox",
+    tillNumber: row.mpesa_till_number ?? undefined,
     passkey: decrypt(row.mpesa_passkey_enc),
     consumerKey: decrypt(row.mpesa_consumer_key_enc),
     consumerSecret: decrypt(row.mpesa_consumer_secret_enc),

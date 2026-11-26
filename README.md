@@ -120,6 +120,15 @@ $secret = "whsec_YOUR_WEBHOOK_SECRET"
 
 The API key identifies the client. The webhook secret signs outgoing webhooks for that client.
 
+Use the printed client ID to save that client's Daraja credentials:
+
+```powershell
+# Replace 123 with the ID printed by client:create
+npm run client:mpesa -- 123
+```
+
+Using the ID avoids ambiguity when multiple clients have the same name.
+
 ## 7. Start a public callback tunnel
 
 Open a second terminal:

@@ -27,17 +27,20 @@ async function main() {
   const passkey = await ask("Passkey: ");
   const consumerKey = await ask("Consumer key: ");
   const consumerSecret = await ask("Consumer secret: ");
+  const tillNumber = typeAnswer === "till" ? await ask("Till number (where the money goes): ") : "";
   rl.close();
 
   if (!/^\d{5,8}$/.test(shortcode)) throw new Error("Shortcode must be 5 to 8 digits");
   if (typeAnswer !== "paybill" && typeAnswer !== "till") throw new Error("Type must be paybill or till");
   if (envAnswer !== "sandbox" && envAnswer !== "production") throw new Error("Environment must be sandbox or production");
   if (!passkey || !consumerKey || !consumerSecret) throw new Error("Nothing can be empty");
+  if (typeAnswer === "till" && !/^\d{5,8}$/.test(tillNumber)) throw new Error("Till number must be 5 to 8 digits");
 
   const ok = await saveMpesaCredentials(clientId, {
     shortcode,
     type: typeAnswer,
     env: envAnswer,
+    tillNumber: tillNumber || undefined,
     passkey,
     consumerKey,
     consumerSecret,

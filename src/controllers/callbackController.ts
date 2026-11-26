@@ -11,8 +11,8 @@ export async function handleStkCallback(req: Request, res: Response) {
   try {
     await processStkCallback(req.body);
   } catch (err: any) {
-    // Log the problem, but still answer Safaricom normally
     console.error("Callback processing failed:", err.message);
+    return res.status(500).json({ ResultCode: 1, ResultDesc: "Callback processing failed" });
   }
 
   // Safaricom just needs to know we received it
