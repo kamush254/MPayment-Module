@@ -15,6 +15,7 @@ function payment(amount: number, status = "PENDING"): repo.Payment {
   return {
     id: "p1",
     idempotency_key: "key1",
+    client_id: 1,
     amount,
     phone: "254700000000",
     account_reference: "ORDER",
